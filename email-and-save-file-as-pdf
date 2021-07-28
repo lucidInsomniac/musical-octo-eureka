@@ -1,0 +1,116 @@
+//pass range as parameters for function
+function sendAndSaveGS2Pdf(range) {
+  
+  //Set desired range, ternary expression if range exists, it is either range, or selected range
+  range = range ? range : "A1:C36";
+  
+  //Google Sheet Tab Name
+  let sheetTabNameToGet = "Master Gear List";
+  
+  //Get Google Sheet Doc
+  let ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  //Get Google Sheet ID
+  let ssID = ss.getId();
+  
+  //Get Tab Name from Google Sheet Doc
+  let sh = ss.getSheetByName(sheetTabNameToGet);
+  
+  //Get Tab Id from Google Sheet Doc
+  let sheetTabId = sh.getSheetId();
+  
+  //Get URL Address, get rid of the edit ending
+  let url_base = ss.getUrl().replace(/edit$/,'');
+
+  //Logger.log('url_base: ' + url_base)
+  
+  //Rename extension on url for Export, and provide specific details to include
+  let exportUrl = url_base + 'export?exportFormat=pdf&format=pdf' +
+
+    '&gid=' + sheetTabId + '&id=' + ssID +
+    '&range=' + range + 
+    //'&range=NamedRange +
+    '&size=A4' +     // paper size
+    '&portrait=true' +   // orientation, false for landscape
+    '&fitw=true' +       // fit to width, false for actual size
+    '&sheetnames=true&printtitle=false&pagenumbers=true' + //hide optional headers and footers
+    '&gridlines=true' + // hide/unhide gridlines
+    '&fzr=false';       // do not repeat row headers (frozen rows) on each page
+
+  //check data is correct for "exportUrl"
+  Logger.log('exportUrl: ' + exportUrl)
+
+  let options = {
+    headers: {
+      'Authorization': 'Bearer ' +  ScriptApp.getOAuthToken(),
+    }
+  }
+
+   options.muteHttpExceptions = true;//Make sure this is always set
+
+  let response = UrlFetchApp.fetch(exportUrl, options);
+
+  Logger.log(response.getResponseCode())
+
+  if (response.getResponseCode() !== 200) {
+    console.log("Error exporting Sheet to PDF!  Response Code: " + response.getResponseCode());
+    return;
+
+  }
+  
+  let blob = response.getBlob();
+
+  blob.setName('Student-Athlete Card: Donna Chin')
+
+   
+  
+  pdfFile = DriveApp.createFile(blob);//Create the PDF file
+  Logger.log('pdfFile ID: ' +pdfFile.getId())
+
+  //Save to folder
+  let folderName = DriveApp.getFolderById('14xpPUcDE9mFyMy_NS_-uwNHrhEmP4-pm');
+  let savePDF = folderName.createFile(pdfFile)
+
+
+  /*******************Send to Email Setup*****************************************/
+  let alias = GmailApp.getAliases()
+    console.log('alias',alias[0])
+
+  let emailAddress = "dc3956@nyu.edu"
+
+  let subject = "Copy of your Athlete Card"
+
+  let message = "Hi Donna, \n\nPlease find a copy of your Student-Athlete Card attached.\n\nThank you, \nDarren"
+
+  //If using Email.App
+  //let message = {
+    //to: "dc3956@nyu.edu",
+    //cc: alias[0],
+    //subject: "Copy of your Athlete Card",
+    //body: "Hi Donna, \n\nPlease find a copy of your Student-Athlete Card attached.\n\nThank you, \nDarren",
+    //name: "Darren",
+    //attachments:[{
+            //fileName: ss.getSheetByName(sheetTabNameToGet).getRange("A1:C36").getValue() + ".pdf",
+            //mimeType: "application/pdf"
+    //}]
+ // }
+
+  //created PDF File ID
+  let attachPdfFile = DriveApp.getFileById(pdfFile.getId())
+  Logger.log('attachPdfFile', attachPdfFile)
+
+  GmailApp.sendEmail(
+    emailAddress, 
+    subject, 
+    message, 
+    {
+      from: alias[0], 
+      cc: alias[0],
+      attachments: [attachPdfFile.getAs(MimeType.PDF)], name: 'Student-Athlete Card: Donna Chin'
+  });
+  
+  console.log('File saved and sent')
+  return savePDF
+
+}
+
